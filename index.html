@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Serial Plotter v1.0</title>
+    <title>Real-Time Serial Plotter v1.1</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        canvas { max-width: 100%; }
+        canvas { max-width: 100%; height: 250px; display: block; }
         button { padding: 10px; margin: 10px; }
         .chart-container { display: flex; flex-direction: column; align-items: center; }
     </style>
 </head>
 <body>
-    <h1>Real-Time Serial Data Plot v1.0</h1>
+    <h1>Real-Time Serial Data Plot v1.1</h1>
     <button id="connectButton">Connect to Serial</button>
     <button id="recordButton">Start Recording</button>
     <button id="downloadButton">Download CSV</button>
@@ -42,7 +42,7 @@
             return new Chart(ctx, {
                 type: 'line',
                 data: { labels: labels, datasets: [{ label: label, data: [], borderColor: color, fill: false }] },
-                options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
             });
         }
         
