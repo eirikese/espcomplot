@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Serial Plotter v1.2</title>
+    <title>Real-Time Serial Plotter  v1.3</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        canvas { max-width: 100%; height: 250px; display: block; }
+        canvas { max-width: 100%; }
         button { padding: 10px; margin: 10px; }
         .chart-container { display: flex; flex-direction: column; align-items: center; }
     </style>
 </head>
 <body>
-    <h1>Real-Time Serial Data Plot v1.2</h1>
+    <h1>Real-Time Serial Data Plot v1.3</h1>
     <button id="connectButton">Connect to Serial</button>
     <button id="recordButton">Start Recording</button>
     <button id="downloadButton">Download CSV</button>
@@ -42,7 +42,7 @@
             return new Chart(ctx, {
                 type: 'line',
                 data: { labels: labels, datasets: [{ label: label, data: [], borderColor: color, fill: false }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
+                options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
             });
         }
         
@@ -88,14 +88,14 @@
                 try {
                     const parts = line.split(',');
                     if (parts.length !== 5) return;
-                    const [, roll, pitch, force, timestamp] = parts.map(item => item.trim());
-                    if (isNaN(roll) || isNaN(pitch) || isNaN(force) || isNaN(timestamp)) return;
+                    const [, roll, pitch, force, timestamp] = parts;
+                    if (!roll || !pitch || !force || !timestamp) return;
                     
                     const timeInSeconds = parseInt(timestamp) / 1000.0;
                     labels.push(timeInSeconds.toFixed(1));
-                    rollData.push(parseFloat(roll));
-                    pitchData.push(parseFloat(pitch));
-                    forceData.push(parseFloat(force));
+                    rollData.push(parseFloat(roll) || 0);
+                    pitchData.push(parseFloat(pitch) || 0);
+                    forceData.push(parseFloat(force) || 0);
                     
                     if (recording) csvData.push([timestamp, roll, pitch, force]);
                     if (labels.length > maxSamples) {
