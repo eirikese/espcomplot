@@ -3,27 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Serial Plotter  v1.3</title>
+    <title>Real-Time Serial Plotter v1.4</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         canvas { max-width: 100%; }
         button { padding: 10px; margin: 10px; }
-        .chart-container { display: flex; flex-direction: column; align-items: center; }
     </style>
 </head>
 <body>
-    <h1>Real-Time Serial Data Plot v1.3</h1>
+    <h1>Real-Time Serial Data Plot v1.4</h1>
     <button id="connectButton">Connect to Serial</button>
     <button id="recordButton">Start Recording</button>
     <button id="downloadButton">Download CSV</button>
     <p id="status">Status: Not Connected</p>
     
-    <div class="chart-container">
-        <canvas id="rollChart"></canvas>
-        <canvas id="pitchChart"></canvas>
-        <canvas id="forceChart"></canvas>
-    </div>
+    <canvas id="chartCanvas"></canvas>
     
     <script>
         let port;
@@ -31,24 +26,25 @@
         let keepReading = false;
         let recording = false;
         let csvData = [['Timestamp', 'Roll (°)', 'Pitch (°)', 'Force (N)']];
-        const maxSamples = 2000;
         
         const labels = [];
         const rollData = [];
         const pitchData = [];
         const forceData = [];
         
-        function createChart(ctx, label, color) {
-            return new Chart(ctx, {
-                type: 'line',
-                data: { labels: labels, datasets: [{ label: label, data: [], borderColor: color, fill: false }] },
-                options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
-            });
-        }
-        
-        const rollChart = createChart(document.getElementById('rollChart').getContext('2d'), 'Roll (°)', 'blue');
-        const pitchChart = createChart(document.getElementById('pitchChart').getContext('2d'), 'Pitch (°)', 'red');
-        const forceChart = createChart(document.getElementById('forceChart').getContext('2d'), 'Force (N)', 'green');
+        const ctx = document.getElementById('chartCanvas').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Roll (°)', data: rollData, borderColor: 'blue', fill: false },
+                    { label: 'Pitch (°)', data: pitchData, borderColor: 'red', fill: false },
+                    { label: 'Force (N)', data: forceData, borderColor: 'green', fill: false }
+                ]
+            },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
+        });
         
         document.getElementById('connectButton').addEventListener('click', async () => {
             try {
@@ -71,7 +67,7 @@
                 try {
                     const { value, done } = await reader.read();
                     if (done) break;
-                    processSerialData(value.trim());
+                    processSerialData(value);
                 } catch (error) {
                     console.error('Serial read error:', error);
                     document.getElementById('status').innerText = 'Status: Disconnected';
@@ -83,36 +79,24 @@
         }
         
         function processSerialData(data) {
-            const lines = data.split('\n').map(line => line.trim()).filter(line => line.startsWith('DATA'));
+            const lines = data.split('\n');
             lines.forEach(line => {
-                try {
-                    const parts = line.split(',');
-                    if (parts.length !== 5) return;
-                    const [, roll, pitch, force, timestamp] = parts;
-                    if (!roll || !pitch || !force || !timestamp) return;
-                    
-                    const timeInSeconds = parseInt(timestamp) / 1000.0;
-                    labels.push(timeInSeconds.toFixed(1));
-                    rollData.push(parseFloat(roll) || 0);
-                    pitchData.push(parseFloat(pitch) || 0);
-                    forceData.push(parseFloat(force) || 0);
-                    
-                    if (recording) csvData.push([timestamp, roll, pitch, force]);
-                    if (labels.length > maxSamples) {
-                        labels.shift(); rollData.shift(); pitchData.shift(); forceData.shift();
+                if (line.startsWith('DATA')) {
+                    try {
+                        const [, roll, pitch, force, timestamp] = line.split(',');
+                        const timeInSeconds = parseInt(timestamp) / 1000.0;
+                        labels.push(timeInSeconds.toFixed(1));
+                        rollData.push(parseFloat(roll) || 0);
+                        pitchData.push(parseFloat(pitch) || 0);
+                        forceData.push(parseFloat(force) || 0);
+                        if (recording) csvData.push([timestamp, roll, pitch, force]);
+                        if (labels.length > 100) {
+                            labels.shift(); rollData.shift(); pitchData.shift(); forceData.shift();
+                        }
+                        chart.update();
+                    } catch (error) {
+                        console.error('Error parsing data:', error);
                     }
-                    
-                    rollChart.data.labels = labels;
-                    rollChart.data.datasets[0].data = rollData;
-                    pitchChart.data.labels = labels;
-                    pitchChart.data.datasets[0].data = pitchData;
-                    forceChart.data.labels = labels;
-                    forceChart.data.datasets[0].data = forceData;
-                    rollChart.update();
-                    pitchChart.update();
-                    forceChart.update();
-                } catch (error) {
-                    console.error('Error parsing data:', error);
                 }
             });
         }
