@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Serial Plotter</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        canvas { max-width: 100%; }
+        button { padding: 10px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Serial Data Plot</h1>
+    <button id="connectButton">Connect to Serial</button>
+    <button id="recordButton">Start Recording</button>
+    <button id="downloadButton">Download CSV</button>
+    <p id="status">Status: Not Connected</p>
+    
+    <canvas id="chartCanvas"></canvas>
+    
+    <script>
+        let port;
+        let reader;
+        let keepReading = false;
+        let recording = false;
+        let csvData = [['Timestamp', 'Roll (°)', 'Pitch (°)', 'Force (N)']];
+        
+        const labels = [];
+        const rollData = [];
+        const pitchData = [];
+        const forceData = [];
+        
+        const ctx = document.getElementById('chartCanvas').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Roll (°)', data: rollData, borderColor: 'blue', fill: false },
+                    { label: 'Pitch (°)', data: pitchData, borderColor: 'red', fill: false },
+                    { label: 'Force (N)', data: forceData, borderColor: 'green', fill: false }
+                ]
+            },
+            options: { responsive: true, scales: { x: { title: { display: true, text: 'Time (s)' } }, y: { title: { display: true, text: 'Values' } } } }
+        });
+        
+        document.getElementById('connectButton').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+                document.getElementById('status').innerText = 'Status: Connected';
+                keepReading = true;
+                readSerial();
+            } catch (error) {
+                console.error('Error connecting to serial:', error);
+            }
+        });
+        
+        async function readSerial() {
+            const textDecoder = new TextDecoderStream();
+            const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+            
+            while (keepReading) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    processSerialData(value);
+                } catch (error) {
+                    console.error('Serial read error:', error);
+                    document.getElementById('status').innerText = 'Status: Disconnected';
+                    keepReading = false;
+                    break;
+                }
+            }
+            reader.releaseLock();
+        }
+        
+        function processSerialData(data) {
+            const lines = data.split('\n');
+            lines.forEach(line => {
+                if (line.startsWith('DATA')) {
+                    try {
+                        const [, roll, pitch, force, timestamp] = line.split(',');
+                        const timeInSeconds = parseInt(timestamp) / 1000.0;
+                        labels.push(timeInSeconds.toFixed(1));
+                        rollData.push(parseFloat(roll) || 0);
+                        pitchData.push(parseFloat(pitch) || 0);
+                        forceData.push(parseFloat(force) || 0);
+                        if (recording) csvData.push([timestamp, roll, pitch, force]);
+                        if (labels.length > 100) {
+                            labels.shift(); rollData.shift(); pitchData.shift(); forceData.shift();
+                        }
+                        chart.update();
+                    } catch (error) {
+                        console.error('Error parsing data:', error);
+                    }
+                }
+            });
+        }
+        
+        document.getElementById('recordButton').addEventListener('click', () => {
+            recording = !recording;
+            document.getElementById('recordButton').innerText = recording ? 'Stop Recording' : 'Start Recording';
+        });
+        
+        document.getElementById('downloadButton').addEventListener('click', () => {
+            if (csvData.length > 1) {
+                const csvContent = csvData.map(row => row.join(',')).join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `M5Stack_data_${Date.now()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+    </script>
+</body>
+</html>
