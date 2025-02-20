@@ -71,7 +71,7 @@
                 try {
                     const { value, done } = await reader.read();
                     if (done) break;
-                    processSerialData(value);
+                    processSerialData(value.trim());
                 } catch (error) {
                     console.error('Serial read error:', error);
                     document.getElementById('status').innerText = 'Status: Disconnected';
@@ -83,32 +83,36 @@
         }
         
         function processSerialData(data) {
-            const lines = data.split('\n');
+            const lines = data.split('\n').map(line => line.trim()).filter(line => line.startsWith('DATA'));
             lines.forEach(line => {
-                if (line.startsWith('DATA')) {
-                    try {
-                        const [, roll, pitch, force, timestamp] = line.split(',');
-                        const timeInSeconds = parseInt(timestamp) / 1000.0;
-                        labels.push(timeInSeconds.toFixed(1));
-                        rollData.push(parseFloat(roll) || 0);
-                        pitchData.push(parseFloat(pitch) || 0);
-                        forceData.push(parseFloat(force) || 0);
-                        if (recording) csvData.push([timestamp, roll, pitch, force]);
-                        if (labels.length > maxSamples) {
-                            labels.shift(); rollData.shift(); pitchData.shift(); forceData.shift();
-                        }
-                        rollChart.data.labels = labels;
-                        rollChart.data.datasets[0].data = rollData;
-                        pitchChart.data.labels = labels;
-                        pitchChart.data.datasets[0].data = pitchData;
-                        forceChart.data.labels = labels;
-                        forceChart.data.datasets[0].data = forceData;
-                        rollChart.update();
-                        pitchChart.update();
-                        forceChart.update();
-                    } catch (error) {
-                        console.error('Error parsing data:', error);
+                try {
+                    const parts = line.split(',');
+                    if (parts.length !== 5) return;
+                    const [, roll, pitch, force, timestamp] = parts.map(item => item.trim());
+                    if (isNaN(roll) || isNaN(pitch) || isNaN(force) || isNaN(timestamp)) return;
+                    
+                    const timeInSeconds = parseInt(timestamp) / 1000.0;
+                    labels.push(timeInSeconds.toFixed(1));
+                    rollData.push(parseFloat(roll));
+                    pitchData.push(parseFloat(pitch));
+                    forceData.push(parseFloat(force));
+                    
+                    if (recording) csvData.push([timestamp, roll, pitch, force]);
+                    if (labels.length > maxSamples) {
+                        labels.shift(); rollData.shift(); pitchData.shift(); forceData.shift();
                     }
+                    
+                    rollChart.data.labels = labels;
+                    rollChart.data.datasets[0].data = rollData;
+                    pitchChart.data.labels = labels;
+                    pitchChart.data.datasets[0].data = pitchData;
+                    forceChart.data.labels = labels;
+                    forceChart.data.datasets[0].data = forceData;
+                    rollChart.update();
+                    pitchChart.update();
+                    forceChart.update();
+                } catch (error) {
+                    console.error('Error parsing data:', error);
                 }
             });
         }
